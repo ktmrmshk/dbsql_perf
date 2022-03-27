@@ -2,6 +2,7 @@ from databricks import sql
 import configparser
 from datetime import datetime
 from multiprocessing import Pool
+import click
 
 class qperf(object):
   def __init__(self, host, path, token):
@@ -55,19 +56,43 @@ class qperf(object):
     with Pool(n_para) as p:
       p.map(self._wapper_execute_from_file, params)
 
-def app():
-  config = configparser.ConfigParser()
-  config.read('config.ini')
-  host = config['default']['host'].replace('https://', '')
-  token = config['default']['token']
-  path = config['default']['path']
 
-  print('>>>', host, token, path)
+@click.command()
+# config, profile, para, query file list, query_tag
+@click.option('-c', '--configure', 'cconfig_file', default='config.ini', type=str, show_default=True)
+@click.option('--profile', default='default', type=str, show_default=True)
+@click.option('-p', '--n_para', default=1, type=int, show_default=True)
+@click.option('-q', '--query_list', required=True, type=str)
+@click.option('-t', '--query_tag', default='', type=str)
+@click.option('--disable_cache', default=True, type=bool, show_default=True)
+def app(cconfig_file, profile, n_para, query_list, query_tag, disable_cache):
+  
+  print(f'cconfig_file: {cconfig_file}')
+  print(f'profile: {profile}')
+  print(f'n_para: {n_para}')
+  print(f'query_list: {query_list}')
+  print(f'query_tag: {query_tag}')
+  print(f'disable_cache: {disable_cache}')
+
+  config = configparser.ConfigParser()
+  config.read(cconfig_file)
+  host = config[profile]['host'].replace('https://', '')
+  token = config[profile]['token']
+  path = config[profile]['path']
 
   qp = qperf(host, path, token)
-  ret = qp.execute('select * from diamonds limit 4;', disable_cache=True)
-  for r in ret:
-    print(r)
+  with open(query_list, 'r') as f:
+    files=f.readlines()
+
+  cleaned_file_list=[]
+  for f in files:
+    _f = f.strip()
+    if len(_f) != 0:
+      cleaned_file_list.append(_f)
+
+  print(cleaned_file_list)
+  qp.execute_from_files_concurrent(cleaned_file_list, n_para, disable_cache, query_tag)
+
 
 if __name__ == '__main__':
   app()
