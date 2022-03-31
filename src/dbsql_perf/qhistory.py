@@ -78,7 +78,7 @@ def app():
   token = config['default']['token']
 
   qh = qhistory(host, token)
-  qh.get_query_history(duration=(3600*24), max_results=100 )
+  qh.get_query_history(duration=(3600*2), max_results=1000 )
   qh.export('test.json', mode='w')
 
 if __name__ == '__main__':

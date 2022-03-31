@@ -3,6 +3,7 @@ import configparser
 from datetime import datetime
 from multiprocessing import Pool
 import click
+import pyodbc
 
 class qperf(object):
   def __init__(self, host, path, token):
@@ -16,21 +17,37 @@ class qperf(object):
   def disconnect(self):
     pass
 
-  def execute(self, query, disable_cache=False, query_tag=''):
-    with sql.connect(server_hostname=self.host, http_path=self.path, access_token=self.token) as conn:
-      with conn.cursor() as cur:
-        start=datetime.now()
-        
-        if disable_cache:
-          cur.execute('SET use_cached_result = false;')
-        if query_tag != '':
-          query = f'--query_tag: {query_tag}\n' + query
-        cur.execute(query)
-        
-        end = datetime.now()
-        dur = (end - start).total_seconds()
-        print(f'query_time: {dur}')
-        return cur.fetchall()
+  def execute(self, query, disable_cache=False, query_tag='', use_odbc=True):
+    if use_odbc:
+      start=datetime.now()
+      conn = pyodbc.connect("DSN=Databricks-Spark", autocommit=True)
+      cur = conn.cursor()
+      if disable_cache:
+        cur.execute('SET use_cached_result = false;')
+      if query_tag != '':
+        query = f'--query_tag: {query_tag}\n' + query
+      cur.execute(query)
+      end = datetime.now()
+      dur = (end - start).total_seconds()
+      print(f'query_time: {dur}')
+      return cur.fetchall()
+
+
+    else:
+      with sql.connect(server_hostname=self.host, http_path=self.path, access_token=self.token) as conn:
+        with conn.cursor() as cur:
+          start=datetime.now()
+          
+          if disable_cache:
+            cur.execute('SET use_cached_result = false;')
+          if query_tag != '':
+            query = f'--query_tag: {query_tag}\n' + query
+          cur.execute(query)
+          
+          end = datetime.now()
+          dur = (end - start).total_seconds()
+          print(f'query_time: {dur}')
+          return cur.fetchall()
 
   def execute_from_file(self, filename, disable_cache=False, query_tag=''):
     with open(filename, 'r') as f:
