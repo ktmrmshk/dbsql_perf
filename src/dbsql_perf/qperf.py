@@ -17,7 +17,7 @@ class qperf(object):
   def disconnect(self):
     pass
 
-  def execute(self, query, disable_cache=False, query_tag='', use_odbc=True):
+  def execute(self, query, disable_cache=False, query_tag='', use_odbc=True, fetch_all=False):
     if use_odbc:
       start=datetime.now()
       conn = pyodbc.connect("DSN=Databricks-Spark", autocommit=True)
@@ -30,7 +30,9 @@ class qperf(object):
       end = datetime.now()
       dur = (end - start).total_seconds()
       print(f'query_time: {dur}')
-      return cur.fetchall()
+      if fetch_all:
+        cur.fetchall()
+      return
 
 
     else:
@@ -49,26 +51,34 @@ class qperf(object):
           print(f'query_time: {dur}')
           return cur.fetchall()
 
-  def execute_from_file(self, filename, disable_cache=False, query_tag=''):
+  def execute_from_file(self, filename, disable_cache=False, query_tag='', fetch_all=False):
     with open(filename, 'r') as f:
       query = f.read()
-    return self.execute(query, disable_cache=disable_cache, query_tag=query_tag)
+    return self.execute(query, disable_cache=disable_cache, query_tag=query_tag, fetch_all=fetch_all)
 
   def execute_from_files(self, filenames, disable_cache=False, query_tag=''):
-    for f in filenames:
-      self.execute_from_file(f, disable_cache=disable_cache, query_tag=query_tag)
+    for i, f in enumerate(filenames):
+      if i==0:
+        fetch_all=True
+      else:
+        fetch_all=False
+      self.execute_from_file(f, disable_cache=disable_cache, query_tag=query_tag, fetch_all=fetch_all)
   
   def _wapper_execute_from_file(self, args):
     '''
     args: {filenames, disable_cache, query_tag}
     '''
-    return self.execute_from_file(args['filename'], args['disable_cache'], args['query_tag'])
+    return self.execute_from_file(args['filename'], args['disable_cache'], args['query_tag'], args['fetch_all'])
 
 
   def execute_from_files_concurrent(self, filenames, n_para=1, disable_cache=False, query_tag=''):
     params=[]
-    for f in filenames:
-      params.append({ 'filename': f, 'disable_cache': disable_cache, 'query_tag': query_tag })
+    for i, f in enumerate(filenames):
+      if i == 0:
+        fetch_all=True
+      else:
+        fetch_all=False
+      params.append({ 'filename': f, 'disable_cache': disable_cache, 'query_tag': query_tag, 'fetch_all': fetch_all })
 
     with Pool(n_para) as p:
       p.map(self._wapper_execute_from_file, params)
